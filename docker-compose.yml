@@ -1,0 +1,139 @@
+version: '3.8'
+
+services:
+  # API Service
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/seo_sage
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+      - ENVIRONMENT=development
+      - LOG_LEVEL=info
+    volumes:
+      - ./:/app
+    depends_on:
+      - db
+    networks:
+      - seo-sage-network
+    restart: unless-stopped
+
+  # Frontend Service
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - NODE_ENV=development
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    depends_on:
+      - api
+    networks:
+      - seo-sage-network
+    restart: unless-stopped
+
+  # Database Service
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=seo_sage
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - seo-sage-network
+    restart: unless-stopped
+
+  # Analytics database
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.3
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    networks:
+      - seo-sage-network
+    restart: unless-stopped
+
+  # Monitoring & Observability
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - seo-sage-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.0.3
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+    networks:
+      - seo-sage-network
+    restart: unless-stopped
+
+  # Background task runner
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/seo_sage
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+      - ENVIRONMENT=development
+      - LOG_LEVEL=info
+    volumes:
+      - ./:/app
+    depends_on:
+      - db
+      - redis
+    networks:
+      - seo-sage-network
+    restart: unless-stopped
+
+  # Redis for background tasks and caching
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - seo-sage-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  clickhouse_data:
+  prometheus_data:
+  grafana_data:
+  redis_data:
+
+networks:
+  seo-sage-network:
+    driver: bridge
