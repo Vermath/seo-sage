@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog } from '@headlessui/react';
 import { XMarkIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { useQuery } from 'react-query';
-import { fetchPageAnalysis } from '../api/analysis';
+import { fetchContentAnalysis } from '../api/analysis';
 
 type ContentSection = {
   id: string;
@@ -22,7 +22,7 @@ const ContentAnalysisModal: React.FC<{
   // Fetch page analysis data
   const { data, isLoading, error } = useQuery(
     ['pageAnalysis', pageUrl],
-    () => fetchPageAnalysis(pageUrl),
+    () => fetchContentAnalysis(pageUrl),
     { enabled: !!pageUrl }
   );
 

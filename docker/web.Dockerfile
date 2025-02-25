@@ -7,8 +7,8 @@ ENV NODE_ENV=development \
     VITE_API_URL=http://localhost:8000
 
 # Install dependencies
-COPY web/package.json web/package-lock.json* ./
-RUN npm ci
+COPY web/package.json ./
+RUN npm install
 
 # Copy application code
 COPY web/ .
